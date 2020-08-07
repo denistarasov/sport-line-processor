@@ -91,7 +91,7 @@ type Update struct {
 func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_SubscribeOnSportLinesServer) error {
 	log.Info("started gRPC server")
 	ctx := srv.Context()
-	childCtx, cancelFunc := context.WithCancel(ctx) // todo cancelFunc
+	childCtx, cancelFunc := context.WithCancel(ctx)
 	senderChan := make(chan map[string]struct{})
 	updateChan := make(chan Update)
 	wg := &sync.WaitGroup{}
@@ -112,6 +112,7 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 
 		req, err := srv.Recv()
 		if err == io.EOF {
+			cancelFunc()
 			log.Info("connection with client closed")
 			return nil
 		}
@@ -128,11 +129,13 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		for _, sportName := range req.SportNames {
 			_, exists := validSportNames[sportName]
 			if !exists {
+				cancelFunc()
 				return UnknownSportNameError
 			}
 
 			pullingInterval := s.sportNamePullingToInterval[sportName]
 			if pullingInterval > req.TimeInterval {
+				cancelFunc()
 				return PeriodicityError
 			}
 		}
@@ -154,7 +157,6 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		if !reflect.DeepEqual(curSports, prevSports) {
 			prevSports = curSports
 			update.sportNames = curSports
-			// todo
 		}
 
 		updateChan <- update
