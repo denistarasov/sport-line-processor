@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -14,12 +15,13 @@ type SportLinesPublisherServer struct {
 	storage *Storage
 }
 
-func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage *Storage, senderChan <-chan map[string]struct{}) {
+func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage *Storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
 	sportNameToPrevLine := make(map[string]float64)
+MainLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			break MainLoop
 		case update := <-senderChan:
 			sportNameToLine := make(map[string]float64)
 			if update == nil {
@@ -54,57 +56,55 @@ func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServ
 			}
 		}
 	}
+	wg.Done()
 }
 
-func timer(ctx context.Context, updateChan chan Update, senderChan chan<- map[string]struct{}) {
+func timer(ctx context.Context, updateChan <-chan Update, senderChan chan<- map[string]struct{}, wg *sync.WaitGroup) {
 	update := <-updateChan
-	ticker := time.NewTicker(update.duration)
+	ticker := time.NewTicker(time.Second * update.duration)
 	senderChan <- update.sportNames
+MainLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			break MainLoop
 		case update = <-updateChan:
-			ticker = time.NewTicker(update.duration)
+			ticker = time.NewTicker(time.Second * update.duration)
 			senderChan <- update.sportNames
 		case <-ticker.C:
 			senderChan <- nil
 		}
 	}
+	wg.Done()
 }
 
 type Update struct {
-	duration time.Duration
-	areSportNamesUpdated bool
-	sportNames map[string]struct{}
+	duration             time.Duration
+	sportNames           map[string]struct{}
 }
 
 func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_SubscribeOnSportLinesServer) error {
 	log.Info("started GRPC server")
 	ctx := srv.Context()
-	timerCtx, _ := context.WithCancel(ctx) // todo cancelFunc
+	childCtx, _ := context.WithCancel(ctx) // todo cancelFunc
 	senderChan := make(chan map[string]struct{})
 	updateChan := make(chan Update)
-	go timer(timerCtx, updateChan, senderChan)
-	go sender(ctx, srv, s.storage, senderChan)
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go timer(childCtx, updateChan, senderChan, wg)
+	go sender(childCtx, srv, s.storage, senderChan, wg)
 
-	//var prevDuration *int32 = nil
 	prevSports := make(map[string]struct{})
 
 	for {
 		select {
 		case <-ctx.Done():
+			wg.Wait()
 			return ctx.Err()
 		default:
 		}
 
 		req, err := srv.Recv()
-		//req.SportNames
-		// todo if sport names are the same, only change ticker time
-
-		//close(s.done)
-		//s.done = make(chan struct{})
-
 		if err == io.EOF {
 			log.Info("connection with client closed")
 			return nil
@@ -116,14 +116,8 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 
 		update := Update{
 			duration:             time.Duration(req.TimeInterval),
-			areSportNamesUpdated: false,
 			sportNames:           nil,
 		}
-
-		//if prevDuration == nil || *prevDuration != req.TimeInterval {
-		//	*prevDuration = req.TimeInterval
-		//	durations <- time.Duration(req.TimeInterval)
-		//}
 
 		curSports := make(map[string]struct{})
 		for _, sportName := range req.SportNames {
@@ -131,7 +125,6 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		}
 		if !reflect.DeepEqual(curSports, prevSports) {
 			prevSports = curSports
-			update.areSportNamesUpdated = true
 			update.sportNames = curSports
 			// todo
 		}
