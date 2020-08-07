@@ -27,6 +27,16 @@ func (s *Storage) Get(key string) (float64, bool) {
 	return value, exists
 }
 
+func (s *Storage) GetKeys() map[string]struct{} {
+	s.m.RLock()
+	defer s.m.RUnlock()
+	keys := make(map[string]struct{}, len(s.s))
+	for key := range s.s {
+		keys[key] = struct{}{}
+	}
+	return keys
+}
+
 func (s *Storage) Count() int {
 	s.m.RLock()
 	defer s.m.RUnlock()

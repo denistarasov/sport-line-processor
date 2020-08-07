@@ -42,3 +42,25 @@ func TestStorage_Count(t *testing.T) {
 	s.Upload("soccer", 0.1)
 	require.Equal(t, 3, s.Count())
 }
+
+func TestStorage_GetKeys(t *testing.T) {
+	s := NewStorage()
+
+	expected := make(map[string]struct{})
+	require.Equal(t, expected, s.GetKeys())
+
+	key := "football"
+	expected[key] = struct{}{}
+	s.Upload(key, 0.1)
+	require.Equal(t, expected, s.GetKeys())
+
+	key = "baseball"
+	expected[key] = struct{}{}
+	s.Upload(key, 0.1)
+	require.Equal(t, expected, s.GetKeys())
+
+	key = "soccer"
+	expected[key] = struct{}{}
+	s.Upload(key, 0.1)
+	require.Equal(t, expected, s.GetKeys())
+}
