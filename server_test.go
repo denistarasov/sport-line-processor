@@ -22,7 +22,7 @@ func init() {
 	log.SetLevel(log.WarnLevel)
 }
 
-func initServer(t *testing.T, storage *Storage) string {
+func initServer(t *testing.T, storage *Storage, sportNamePullingToInterval map[string]int32) string {
 	serverAddr := "localhost:0"
 	listener, err := net.Listen("tcp", serverAddr)
 	if err != nil {
@@ -30,7 +30,7 @@ func initServer(t *testing.T, storage *Storage) string {
 	}
 	serverStarted := make(chan struct{})
 	go func(listener net.Listener) {
-		err := StartSportLinesPublisher(storage, listener, serverStarted)
+		err := StartSportLinesPublisher(storage, listener, serverStarted,  sportNamePullingToInterval)
 		if err != nil {
 			t.Fatal("server finished with error: ", err)
 		}
@@ -59,24 +59,15 @@ func initClient(t *testing.T, serverAddr string) SportLinesService_SubscribeOnSp
 
 func TestGRPCServer_Ping(t *testing.T) {
 	storage := NewStorage()
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	req := &SportLinesRequest{
-		SportNames:   []string{}, // todo list cannot be empty
+		SportNames:   []string{"soccer"},
 		TimeInterval: 1,
 	}
 	err := stream.Send(req)
-	if err != nil {
-		t.Fatal("client was unable to send request, err:", err)
-	}
-
-	resp, err := stream.Recv()
-	if err != nil {
-		t.Fatal("client was unable to receive response, err:", err)
-	}
-
-	require.Equal(t, map[string]float64(nil), resp.SportNameToLine)
+	require.NoError(t, err)
 }
 
 func TestGRPCServer_Simple(t *testing.T) {
@@ -84,7 +75,7 @@ func TestGRPCServer_Simple(t *testing.T) {
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	req := &SportLinesRequest{
@@ -109,7 +100,7 @@ func TestGRPCServer_Interval(t *testing.T) {
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	timeInterval := int32(2)
@@ -143,7 +134,7 @@ func TestGRPCServer_Deltas(t *testing.T) {
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	req := &SportLinesRequest{
@@ -178,7 +169,7 @@ func TestGRPCServer_ManySports(t *testing.T) {
 	sportLine2 := 0.6
 	storage.Upload(sportName, sportLine)
 	storage.Upload(sportName2, sportLine2)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	req := &SportLinesRequest{
@@ -201,7 +192,7 @@ func TestGRPCServer_IntervalChange(t *testing.T) {
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	timeInterval := int32(2)
@@ -255,7 +246,7 @@ func TestGRPCServer_NoDeltasAfterSportChanges(t *testing.T) {
 	sportLine2 := 0.6
 	storage.Upload(sportName, sportLine)
 	storage.Upload(sportName2, sportLine2)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	req := &SportLinesRequest{
@@ -295,7 +286,7 @@ func TestGRPCServer_ManySubscribers(t *testing.T) {
 	sportLine2 := 0.6
 	storage.Upload(sportName, sportLine)
 	storage.Upload(sportName2, sportLine2)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 
 	clientFunc := func(serverAddr, sportName string, sportLine float64, timeInterval int32, wg *sync.WaitGroup) {
 		stream := initClient(t, serverAddr)
@@ -341,7 +332,7 @@ func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
-	serverAddr := initServer(t, storage)
+	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
 	timeInterval := int32(1)
@@ -376,8 +367,78 @@ func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
 	require.LessOrEqual(t, math.Abs(delta - resp.SportNameToLine[sportName]), eps)
 }
 
-// todo other tests for GRPC errors
-func TestGRPCServer_GetInvalidSportName(t *testing.T) {}
-func TestGRPCServer_IntervalLessThanStorageUpdate(t *testing.T) {}
-func TestGRPCServer_SportNamesDuplicates(t *testing.T) {}
-func TestGRPCServer_EmptySportNamesList(t *testing.T) {}
+func TestGRPCServer_GetInvalidSportName(t *testing.T) {
+	storage := NewStorage()
+	serverAddr := initServer(t, storage, nil)
+	stream := initClient(t, serverAddr)
+
+	req := &SportLinesRequest{
+		SportNames:   []string{"tennis"},
+		TimeInterval: 1,
+	}
+	err := stream.Send(req)
+	if err != nil {
+		t.Fatal("client was unable to send request, err:", err)
+	}
+	_, err = stream.Recv()
+	require.Error(t, err)
+	require.Equal(t, UnknownSportNameError.Error(), err.Error())
+}
+
+func TestGRPCServer_EmptySportNamesList(t *testing.T) {
+	storage := NewStorage()
+	serverAddr := initServer(t, storage, nil)
+	stream := initClient(t, serverAddr)
+
+	req := &SportLinesRequest{
+		SportNames:   []string{},
+		TimeInterval: 1,
+	}
+	err := stream.Send(req)
+	if err != nil {
+		t.Fatal("client was unable to send request, err:", err)
+	}
+	_, err = stream.Recv()
+	require.Error(t, err)
+	require.Equal(t, EmptySportListError.Error(), err.Error())
+}
+
+func TestGRPCServer_SportNamesDuplicates(t *testing.T) {
+	storage := NewStorage()
+	storage.Upload("football", 0.1)
+	storage.Upload("soccer", 0.2)
+	serverAddr := initServer(t, storage, nil)
+	stream := initClient(t, serverAddr)
+
+	req := &SportLinesRequest{
+		SportNames:   []string{"football", "soccer", "football"},
+		TimeInterval: 1,
+	}
+	err := stream.Send(req)
+	if err != nil {
+		t.Fatal("client was unable to send request, err:", err)
+	}
+	_, err = stream.Recv()
+	require.Error(t, err)
+	require.Equal(t, DuplicateError.Error(), err.Error())
+}
+
+func TestGRPCServer_IntervalLessThanStorageUpdate(t *testing.T) {
+	// todo other tests for GRPC errors
+	storage := NewStorage()
+	storage.Upload("football", 0.1)
+	serverAddr := initServer(t, storage, map[string]int32{"football": 2})
+	stream := initClient(t, serverAddr)
+
+	req := &SportLinesRequest{
+		SportNames:   []string{"football"},
+		TimeInterval: 1,
+	}
+	err := stream.Send(req)
+	if err != nil {
+		t.Fatal("client was unable to send request, err:", err)
+	}
+	_, err = stream.Recv()
+	require.Error(t, err)
+	require.Equal(t, PeriodicityError.Error(), err.Error())
+}
