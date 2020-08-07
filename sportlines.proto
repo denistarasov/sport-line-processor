@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package protobuf;
+
+message SportLinesRequest {
+    repeated string sportNames = 1;
+    int32 timeInterval = 2;
+}
+
+message SportLinesResponse {
+    map<string, double> sportNameToLine = 1;
+}
+
+service SportLinesService {
+    rpc subscribeOnSportLines(stream SportLinesRequest) returns (stream SportLinesResponse) {}
+}
