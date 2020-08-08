@@ -22,20 +22,24 @@ func init() {
 	log.SetLevel(log.WarnLevel)
 }
 
-func initServer(t *testing.T, storage *Storage, sportNamePullingToInterval map[string]int32) string {
+func initServer(t *testing.T, storage *Storage, sportNameToPullingInterval map[string]int32) string {
 	serverAddr := "localhost:0"
 	listener, err := net.Listen("tcp", serverAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	serverStarted := make(chan struct{})
-	go func(listener net.Listener) {
-		err := StartSportLinesPublisher(storage, listener, serverStarted,  sportNamePullingToInterval)
+	s := grpc.NewServer()
+	RegisterSportLinesServiceServer(s, SportLinesPublisherServer{
+		storage:                    storage,
+		sportNameToPullingInterval: sportNameToPullingInterval,
+	})
+	go func(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) {
+		err := StartSportLinesPublisher(s, listener, serverStarted)
 		if err != nil {
 			t.Fatal("server finished with error: ", err)
 		}
-		fmt.Println("server finished")
-	}(listener)
+	}(s, listener, serverStarted)
 
 	<-serverStarted
 

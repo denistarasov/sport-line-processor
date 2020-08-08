@@ -6,54 +6,91 @@ import (
 	"flag"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 )
 
 func main() {
-	// http address
-	// grpc address
-	// baseball, football, soccer intervals
-	// logging level
-	httpAddress := flag.String("http", ":0", "desired address for http server")
-	grpcAddress := flag.String("grpc", ":0", "desired address for grpc server")
-	//linesProviderAddress := flag.String("provider", "", "address for lines provider server")
-	flag.Int("baseball", 1, "interval for pulling baseball lines (seconds)")
-	flag.Int("football", 1, "interval for pulling football lines (seconds)")
-	flag.Int("soccer", 1, "interval for pulling soccer lines (seconds)")
+	httpAddr := flag.String("http", ":8090", "address for http server")
+	grpcAddr := flag.String("grpc", ":8091", "address for grpc server")
+	linesProviderAddr := flag.String("provider", "http://localhost:8000/api/v1/lines/", "address for lines provider server")
+
+	sportNameToPullingInterval := make(map[string]int32)
+	sportNameToPullingInterval["baseball"] = int32(*flag.Int("baseball", 1, "interval for pulling baseball lines (seconds)"))
+	sportNameToPullingInterval["football"] = int32(*flag.Int("football", 1, "interval for pulling football lines (seconds)"))
+	sportNameToPullingInterval["soccer"] = int32(*flag.Int("soccer", 1, "interval for pulling soccer lines (seconds)"))
+
+	logLevel := *flag.String("log", "info", "log level, allowed options: debug, info, warn, error, fatal")
+
 	flag.Parse()
+
+	switch strings.ToLower(logLevel) {
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	case "fatal":
+		log.SetLevel(log.FatalLevel)
+	}
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 	})
-	log.SetLevel(log.DebugLevel)
-	log.Info(fmt.Sprintf("starting program (http_address: %s, grpc_address: %s)", *httpAddress, *grpcAddress))
+	log.Info(fmt.Sprintf("starting program (http_address: %s, grpc_address: %s)", *httpAddr, *grpcAddr))
 
 	storage := NewStorage()
 
 	sportNames := []string{"baseball", "football", "soccer"}
-	linesProviderAddr := "http://localhost:8000/api/v1/lines/"
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
-	lp := NewLinePuller(ctx, linesProviderAddr, sportNames, storage, wg)
+	lp := NewLinePuller(ctx, *linesProviderAddr, sportNames, storage, wg)
 
-	srv := &http.Server{Addr: ":8090"}
+	// Start HTTP server
+	srv := &http.Server{Addr: *httpAddr}
 	http.HandleFunc("/ready", readyHandler(lp))
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("ListenAndServe(): %v", err)
 		}
 		log.Info("server is shut down")
-		wg.Done()
 	}()
 
+	// Start gRPC server
+	wg.Add(1)
+	grpcServer := grpc.NewServer()
+	RegisterSportLinesServiceServer(grpcServer, SportLinesPublisherServer{
+		storage:                    storage,
+		sportNameToPullingInterval: sportNameToPullingInterval,
+	})
+	go func(s *grpc.Server, serverAddr string) {
+		defer wg.Done()
+		listener, err := net.Listen("tcp", serverAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		serverStarted := make(chan struct{})
+		err = StartSportLinesPublisher(s, listener, serverStarted)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Info("grpc server is shut down")
+	}(grpcServer, *grpcAddr)
+
+	// Prepare for graceful stop
 	shutdownSignals := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
-
 	sig := <-shutdownSignals
 	log.Infof("received signal (%s), gracefully shutting down...", sig.String())
 	cancelFunc()
@@ -61,6 +98,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	grpcServer.GracefulStop()
 	wg.Wait()
 }
 

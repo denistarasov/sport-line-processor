@@ -24,7 +24,7 @@ var (
 
 type SportLinesPublisherServer struct {
 	storage                    *Storage
-	sportNamePullingToInterval map[string]int32
+	sportNameToPullingInterval map[string]int32
 }
 
 func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage *Storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
@@ -133,7 +133,7 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 				return UnknownSportNameError
 			}
 
-			pullingInterval := s.sportNamePullingToInterval[sportName]
+			pullingInterval := s.sportNameToPullingInterval[sportName]
 			if pullingInterval > req.TimeInterval {
 				cancelFunc()
 				return PeriodicityError
@@ -163,16 +163,10 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 	}
 }
 
-func StartSportLinesPublisher(storage *Storage, listener net.Listener, serverStarted chan struct{}, sportNamePullingToInterval map[string]int32) error {
-	s := grpc.NewServer()
-	RegisterSportLinesServiceServer(s, SportLinesPublisherServer{
-		storage: storage,
-		sportNamePullingToInterval: sportNamePullingToInterval,
-	})
+func StartSportLinesPublisher(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) error {
 	close(serverStarted)
 	err := s.Serve(listener)
 	if err != nil {
-		//log.Fatal("Failed to serve: ", err)
 		return err
 	}
 	return nil
