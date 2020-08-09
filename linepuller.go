@@ -37,7 +37,7 @@ func NewLinePuller(ctx context.Context, linesProviderAddr string, sportNames []s
 		sportNames:         sportNames,
 		storage:            storage,
 		isLineProviderDown: false,
-		wg:					wg,
+		wg:                 wg,
 	}
 
 	lp.Lock()

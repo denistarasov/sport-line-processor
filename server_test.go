@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"math"
@@ -10,7 +11,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 var eps = 0.0001
@@ -156,13 +156,13 @@ func TestGRPCServer_Deltas(t *testing.T) {
 	}
 
 	delta := 0.1
-	storage.Upload(sportName, sportLine + delta)
+	storage.Upload(sportName, sportLine+delta)
 	resp, err = stream.Recv()
 	if err != nil {
 		t.Fatal("client was unable to receive response, err:", err)
 	}
 	require.Equal(t, 1, len(resp.SportNameToLine))
-	require.LessOrEqual(t, math.Abs(delta - resp.SportNameToLine[sportName]), eps)
+	require.LessOrEqual(t, math.Abs(delta-resp.SportNameToLine[sportName]), eps)
 }
 
 func TestGRPCServer_ManySports(t *testing.T) {
@@ -354,7 +354,7 @@ func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
 	}
 
 	delta := 0.25
-	storage.Upload(sportName, sportLine + delta)
+	storage.Upload(sportName, sportLine+delta)
 	req = &SportLinesRequest{
 		SportNames:   []string{sportName},
 		TimeInterval: timeInterval + 1,
@@ -368,7 +368,7 @@ func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
 		t.Fatal("client was unable to receive response, err:", err)
 	}
 	require.Equal(t, 1, len(resp.SportNameToLine))
-	require.LessOrEqual(t, math.Abs(delta - resp.SportNameToLine[sportName]), eps)
+	require.LessOrEqual(t, math.Abs(delta-resp.SportNameToLine[sportName]), eps)
 }
 
 func TestGRPCServer_GetInvalidSportName(t *testing.T) {

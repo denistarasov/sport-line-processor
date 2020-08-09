@@ -16,10 +16,10 @@ import (
 type GRPCServerError error
 
 var (
-	DuplicateError GRPCServerError = status.Error(codes.InvalidArgument, "duplicates in sport list")
-	PeriodicityError GRPCServerError = status.Error(codes.InvalidArgument, "periodicity of sending lines is more frequent than their pulling periodicity")
+	DuplicateError        GRPCServerError = status.Error(codes.InvalidArgument, "duplicates in sport list")
+	PeriodicityError      GRPCServerError = status.Error(codes.InvalidArgument, "periodicity of sending lines is more frequent than their pulling periodicity")
 	UnknownSportNameError GRPCServerError = status.Error(codes.InvalidArgument, "sport name is unknown")
-	EmptySportListError GRPCServerError = status.Error(codes.InvalidArgument, "sport list can't be empty")
+	EmptySportListError   GRPCServerError = status.Error(codes.InvalidArgument, "sport list can't be empty")
 )
 
 type SportLinesPublisherServer struct {
@@ -113,7 +113,7 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		req, err := srv.Recv()
 		if err == io.EOF {
 			cancelFunc()
-			log.Info("connection with client closed")
+			log.Info("connection with client closed due to EOF")
 			return nil
 		}
 		if err != nil {
