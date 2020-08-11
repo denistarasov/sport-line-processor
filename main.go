@@ -53,12 +53,12 @@ func main() {
 
 	log.Infof("starting program (http_address: %s, grpc_address: %s, provider address: %s)", *httpAddr, *grpcAddr, *linesProviderAddr)
 
-	storage := NewStorage()
+	storage := newStorage()
 
 	sportNames := []string{"baseball", "football", "soccer"}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
-	lp := NewLinePuller(ctx, *linesProviderAddr, sportNames, storage, wg)
+	lp := newLinePuller(ctx, *linesProviderAddr, sportNames, storage, wg)
 
 	// Start HTTP server
 	srv := &http.Server{Addr: *httpAddr}
@@ -75,7 +75,7 @@ func main() {
 	// Start gRPC server
 	wg.Add(1)
 	grpcServer := grpc.NewServer()
-	RegisterSportLinesServiceServer(grpcServer, SportLinesPublisherServer{
+	RegisterSportLinesServiceServer(grpcServer, sportLinesPublisherServer{
 		storage:                    storage,
 		sportNameToPullingInterval: sportNameToPullingInterval,
 	})
@@ -86,7 +86,7 @@ func main() {
 			log.Fatal(err)
 		}
 		serverStarted := make(chan struct{})
-		err = StartSportLinesPublisher(s, listener, serverStarted)
+		err = startSportLinesPublisher(s, listener, serverStarted)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -107,25 +107,25 @@ func main() {
 	wg.Wait()
 }
 
-func readyHandler(lp *LinePuller) http.HandlerFunc {
+func readyHandler(lp *linePuller) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Info("/ready: received request")
 		encoder := json.NewEncoder(w)
 		status := lp.isReady()
 		switch status {
-		case Ready:
+		case ready:
 			log.Info("/ready: status ok")
 			w.WriteHeader(http.StatusOK)
 			encoder.Encode(map[string]string{
 				"response": "OK",
 			})
-		case NotReady:
+		case notReady:
 			w.WriteHeader(http.StatusServiceUnavailable)
 			log.Info("/ready: not all sports were pulled yet")
 			encoder.Encode(map[string]string{
 				"response": "Please try later",
 			})
-		case LinesProviderIsUnavailable:
+		case linesProviderIsUnavailable:
 			log.Info("/ready: lines provider is not available at all")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			encoder.Encode(map[string]string{

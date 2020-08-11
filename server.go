@@ -13,21 +13,21 @@ import (
 	"time"
 )
 
-type GRPCServerError error
+type gRPCServerError error
 
 var (
-	DuplicateError        GRPCServerError = status.Error(codes.InvalidArgument, "duplicates in sport list")
-	PeriodicityError      GRPCServerError = status.Error(codes.InvalidArgument, "periodicity of sending lines is more frequent than their pulling periodicity")
-	UnknownSportNameError GRPCServerError = status.Error(codes.InvalidArgument, "sport name is unknown")
-	EmptySportListError   GRPCServerError = status.Error(codes.InvalidArgument, "sport list can't be empty")
+	duplicateError        gRPCServerError = status.Error(codes.InvalidArgument, "duplicates in sport list")
+	periodicityError      gRPCServerError = status.Error(codes.InvalidArgument, "periodicity of sending lines is more frequent than their pulling periodicity")
+	unknownSportNameError gRPCServerError = status.Error(codes.InvalidArgument, "sport name is unknown")
+	emptySportListError   gRPCServerError = status.Error(codes.InvalidArgument, "sport list can't be empty")
 )
 
-type SportLinesPublisherServer struct {
-	storage                    *Storage
+type sportLinesPublisherServer struct {
+	storage                    *storage
 	sportNameToPullingInterval map[string]int32
 }
 
-func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage *Storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
+func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage *storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
 	sportNameToPrevLine := make(map[string]float64)
 MainLoop:
 	for {
@@ -64,7 +64,7 @@ MainLoop:
 	wg.Done()
 }
 
-func timer(ctx context.Context, updateChan <-chan Update, senderChan chan<- map[string]struct{}, wg *sync.WaitGroup) {
+func timer(ctx context.Context, updateChan <-chan update, senderChan chan<- map[string]struct{}, wg *sync.WaitGroup) {
 	update := <-updateChan
 	ticker := time.NewTicker(time.Second * update.duration)
 	senderChan <- update.sportNames
@@ -83,17 +83,17 @@ MainLoop:
 	wg.Done()
 }
 
-type Update struct {
+type update struct {
 	duration   time.Duration
 	sportNames map[string]struct{}
 }
 
-func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_SubscribeOnSportLinesServer) error {
+func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_SubscribeOnSportLinesServer) error {
 	log.Info("started gRPC server")
 	ctx := srv.Context()
 	childCtx, cancelFunc := context.WithCancel(ctx)
 	senderChan := make(chan map[string]struct{})
-	updateChan := make(chan Update)
+	updateChan := make(chan update)
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go timer(childCtx, updateChan, senderChan, wg)
@@ -124,24 +124,24 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 
 		if len(req.SportNames) == 0 {
 			cancelFunc()
-			return EmptySportListError
+			return emptySportListError
 		}
 
 		for _, sportName := range req.SportNames {
 			_, exists := validSportNames[sportName]
 			if !exists {
 				cancelFunc()
-				return UnknownSportNameError
+				return unknownSportNameError
 			}
 
 			pullingInterval := s.sportNameToPullingInterval[sportName]
 			if pullingInterval > req.TimeInterval {
 				cancelFunc()
-				return PeriodicityError
+				return periodicityError
 			}
 		}
 
-		update := Update{
+		update := update{
 			duration:   time.Duration(req.TimeInterval),
 			sportNames: nil,
 		}
@@ -151,7 +151,7 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 			_, exists := curSports[sportName]
 			if exists {
 				cancelFunc()
-				return DuplicateError
+				return duplicateError
 			}
 			curSports[sportName] = struct{}{}
 		}
@@ -164,7 +164,7 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 	}
 }
 
-func StartSportLinesPublisher(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) error {
+func startSportLinesPublisher(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) error {
 	close(serverStarted)
 	err := s.Serve(listener)
 	if err != nil {

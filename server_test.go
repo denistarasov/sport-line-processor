@@ -22,7 +22,7 @@ func init() {
 	log.SetLevel(log.WarnLevel)
 }
 
-func initServer(t *testing.T, storage *Storage, sportNameToPullingInterval map[string]int32) string {
+func initServer(t *testing.T, storage *storage, sportNameToPullingInterval map[string]int32) string {
 	serverAddr := "localhost:0"
 	listener, err := net.Listen("tcp", serverAddr)
 	if err != nil {
@@ -30,12 +30,12 @@ func initServer(t *testing.T, storage *Storage, sportNameToPullingInterval map[s
 	}
 	serverStarted := make(chan struct{})
 	s := grpc.NewServer()
-	RegisterSportLinesServiceServer(s, SportLinesPublisherServer{
+	RegisterSportLinesServiceServer(s, sportLinesPublisherServer{
 		storage:                    storage,
 		sportNameToPullingInterval: sportNameToPullingInterval,
 	})
 	go func(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) {
-		err := StartSportLinesPublisher(s, listener, serverStarted)
+		err := startSportLinesPublisher(s, listener, serverStarted)
 		if err != nil {
 			t.Fatal("server finished with error: ", err)
 		}
@@ -62,7 +62,7 @@ func initClient(t *testing.T, serverAddr string) SportLinesService_SubscribeOnSp
 }
 
 func TestGRPCServer_Ping(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
@@ -75,7 +75,7 @@ func TestGRPCServer_Ping(t *testing.T) {
 }
 
 func TestGRPCServer_Simple(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
@@ -100,7 +100,7 @@ func TestGRPCServer_Simple(t *testing.T) {
 }
 
 func TestGRPCServer_Interval(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
@@ -134,7 +134,7 @@ func TestGRPCServer_Interval(t *testing.T) {
 }
 
 func TestGRPCServer_Deltas(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
@@ -166,7 +166,7 @@ func TestGRPCServer_Deltas(t *testing.T) {
 }
 
 func TestGRPCServer_ManySports(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	sportName2 := "baseball"
@@ -192,7 +192,7 @@ func TestGRPCServer_ManySports(t *testing.T) {
 }
 
 func TestGRPCServer_IntervalChange(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
@@ -220,7 +220,7 @@ func TestGRPCServer_IntervalChange(t *testing.T) {
 	elapsedTime := int32(time.Since(start).Seconds())
 	require.GreaterOrEqual(t, elapsedTime, timeInterval)
 
-	timeInterval -= 1
+	timeInterval--
 	req = &SportLinesRequest{
 		SportNames:   []string{sportName},
 		TimeInterval: timeInterval,
@@ -243,7 +243,7 @@ func TestGRPCServer_IntervalChange(t *testing.T) {
 }
 
 func TestGRPCServer_NoDeltasAfterSportChanges(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	sportName2 := "baseball"
@@ -283,7 +283,7 @@ func TestGRPCServer_NoDeltasAfterSportChanges(t *testing.T) {
 }
 
 func TestGRPCServer_ManySubscribers(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	sportName2 := "baseball"
@@ -332,7 +332,7 @@ func TestGRPCServer_ManySubscribers(t *testing.T) {
 func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
 	// send 2 times same list of sports
 	// todo
-	storage := NewStorage()
+	storage := newStorage()
 	sportName := "soccer"
 	sportLine := 0.5
 	storage.Upload(sportName, sportLine)
@@ -372,7 +372,7 @@ func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
 }
 
 func TestGRPCServer_GetInvalidSportName(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
@@ -386,11 +386,11 @@ func TestGRPCServer_GetInvalidSportName(t *testing.T) {
 	}
 	_, err = stream.Recv()
 	require.Error(t, err)
-	require.Equal(t, UnknownSportNameError.Error(), err.Error())
+	require.Equal(t, unknownSportNameError.Error(), err.Error())
 }
 
 func TestGRPCServer_EmptySportNamesList(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	serverAddr := initServer(t, storage, nil)
 	stream := initClient(t, serverAddr)
 
@@ -404,11 +404,11 @@ func TestGRPCServer_EmptySportNamesList(t *testing.T) {
 	}
 	_, err = stream.Recv()
 	require.Error(t, err)
-	require.Equal(t, EmptySportListError.Error(), err.Error())
+	require.Equal(t, emptySportListError.Error(), err.Error())
 }
 
 func TestGRPCServer_SportNamesDuplicates(t *testing.T) {
-	storage := NewStorage()
+	storage := newStorage()
 	storage.Upload("football", 0.1)
 	storage.Upload("soccer", 0.2)
 	serverAddr := initServer(t, storage, nil)
@@ -424,12 +424,12 @@ func TestGRPCServer_SportNamesDuplicates(t *testing.T) {
 	}
 	_, err = stream.Recv()
 	require.Error(t, err)
-	require.Equal(t, DuplicateError.Error(), err.Error())
+	require.Equal(t, duplicateError.Error(), err.Error())
 }
 
 func TestGRPCServer_IntervalLessThanStorageUpdate(t *testing.T) {
 	// todo other tests for GRPC errors
-	storage := NewStorage()
+	storage := newStorage()
 	storage.Upload("football", 0.1)
 	serverAddr := initServer(t, storage, map[string]int32{"football": 2})
 	stream := initClient(t, serverAddr)
@@ -444,5 +444,5 @@ func TestGRPCServer_IntervalLessThanStorageUpdate(t *testing.T) {
 	}
 	_, err = stream.Recv()
 	require.Error(t, err)
-	require.Equal(t, PeriodicityError.Error(), err.Error())
+	require.Equal(t, periodicityError.Error(), err.Error())
 }

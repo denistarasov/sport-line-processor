@@ -6,7 +6,7 @@ import (
 )
 
 func TestStorage_Simple(t *testing.T) {
-	s := NewStorage()
+	s := newStorage()
 	require.Equal(t, 0, s.Count())
 
 	_, exists := s.Get("football")
@@ -20,7 +20,7 @@ func TestStorage_Simple(t *testing.T) {
 }
 
 func TestStorage_Update(t *testing.T) {
-	s := NewStorage()
+	s := newStorage()
 	s.Upload("football", 0.1)
 	require.Equal(t, 1, s.Count())
 
@@ -31,7 +31,7 @@ func TestStorage_Update(t *testing.T) {
 }
 
 func TestStorage_Count(t *testing.T) {
-	s := NewStorage()
+	s := newStorage()
 
 	s.Upload("football", 0.1)
 	require.Equal(t, 1, s.Count())
@@ -44,7 +44,7 @@ func TestStorage_Count(t *testing.T) {
 }
 
 func TestStorage_GetKeys(t *testing.T) {
-	s := NewStorage()
+	s := newStorage()
 
 	expected := make(map[string]struct{})
 	require.Equal(t, expected, s.GetKeys())

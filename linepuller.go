@@ -13,25 +13,25 @@ import (
 	"time"
 )
 
-type LinePullerStatus int
+type linePullerStatus int
 
 const (
-	Ready LinePullerStatus = iota
-	NotReady
-	LinesProviderIsUnavailable
+	ready linePullerStatus = iota
+	notReady
+	linesProviderIsUnavailable
 )
 
-type LinePuller struct {
+type linePuller struct {
 	sync.Mutex
 	linesProviderAddr  string
 	sportNames         []string
-	storage            *Storage
+	storage            *storage
 	isLineProviderDown bool
 	wg                 *sync.WaitGroup
 }
 
-func NewLinePuller(ctx context.Context, linesProviderAddr string, sportNames []string, storage *Storage, wg *sync.WaitGroup) *LinePuller {
-	lp := &LinePuller{
+func newLinePuller(ctx context.Context, linesProviderAddr string, sportNames []string, storage *storage, wg *sync.WaitGroup) *linePuller {
+	lp := &linePuller{
 		Mutex:              sync.Mutex{},
 		linesProviderAddr:  linesProviderAddr,
 		sportNames:         sportNames,
@@ -49,7 +49,7 @@ func NewLinePuller(ctx context.Context, linesProviderAddr string, sportNames []s
 	return lp
 }
 
-func (lp *LinePuller) StartLinePullerWorker(ctx context.Context, linesProviderAddr, sportName string, ticker *time.Ticker) {
+func (lp *linePuller) StartLinePullerWorker(ctx context.Context, linesProviderAddr, sportName string, ticker *time.Ticker) {
 	log.Infof("starting worker for %s", sportName)
 PullingLoop:
 	for {
@@ -91,16 +91,14 @@ PullingLoop:
 	lp.wg.Done()
 }
 
-func (lp *LinePuller) isReady() LinePullerStatus {
+func (lp *linePuller) isReady() linePullerStatus {
 	lp.Lock()
 	defer lp.Unlock()
 	if lp.storage.Count() == len(lp.sportNames) {
-		return Ready
-	} else {
-		if lp.isLineProviderDown {
-			return LinesProviderIsUnavailable
-		} else {
-			return NotReady
-		}
+		return ready
 	}
+	if lp.isLineProviderDown {
+		return linesProviderIsUnavailable
+	}
+	return notReady
 }
