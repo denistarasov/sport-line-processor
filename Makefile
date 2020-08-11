@@ -1,7 +1,7 @@
 
 lint:
 	@echo "Running lint"
-    go vet ./...
+	go vet ./...
 
 tests:
 	@echo "Running tests"
