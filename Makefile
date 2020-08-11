@@ -1,22 +1,13 @@
 
 install:
 	@echo "Install dependencies"
-	export GOPATH=$HOME/golang
-	export GOROOT=/usr/local/opt/go/libexec
-	export PATH=$PATH:$GOPATH/bin
-	export PATH=$PATH:$GOROOT/bin
-	export CGO_ENABLED=1; export CC=gcc;
-	export PATH=$PATH:/Users/james/golang/bin/golint
-	export GO111MODULE=on
 	go get ./...
 
 lint: install
 	@echo "Running lint"
 	go vet ./...
-	go install golang.org/x/lint/golint
-	golint ./...
-	go install github.com/go-critic/go-critic/...
-	gocritic check -enableAll ./...
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.30.0
+    $(go env GOPATH)/bin/golangci-lint run -E gocritic -E golint
 
 tests:
 	@echo "Running tests"

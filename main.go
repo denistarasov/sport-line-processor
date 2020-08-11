@@ -99,7 +99,7 @@ func main() {
 	sig := <-shutdownSignals
 	log.Infof("received signal (%s), gracefully shutting down...", sig.String())
 	cancelFunc()
-	err := srv.Shutdown(nil)
+	err := srv.Shutdown(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,19 +116,19 @@ func readyHandler(lp *linePuller) http.HandlerFunc {
 		case ready:
 			log.Info("/ready: status ok")
 			w.WriteHeader(http.StatusOK)
-			encoder.Encode(map[string]string{
+			_ = encoder.Encode(map[string]string{
 				"response": "OK",
 			})
 		case notReady:
 			w.WriteHeader(http.StatusServiceUnavailable)
 			log.Info("/ready: not all sports were pulled yet")
-			encoder.Encode(map[string]string{
+			_ = encoder.Encode(map[string]string{
 				"response": "Please try later",
 			})
 		case linesProviderIsUnavailable:
 			log.Info("/ready: lines provider is not available at all")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			encoder.Encode(map[string]string{
+			_ = encoder.Encode(map[string]string{
 				"response": "Service is unavailable",
 			})
 		}

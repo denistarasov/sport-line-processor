@@ -34,10 +34,11 @@ func initServer(t *testing.T, storage *storage, sportNameToPullingInterval map[s
 		storage:                    storage,
 		sportNameToPullingInterval: sportNameToPullingInterval,
 	})
+
 	go func(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) {
 		err := startSportLinesPublisher(s, listener, serverStarted)
 		if err != nil {
-			t.Fatal("server finished with error: ", err)
+			t.Error("server finished with error: ", err)
 		}
 	}(s, listener, serverStarted)
 
@@ -150,14 +151,14 @@ func TestGRPCServer_Deltas(t *testing.T) {
 		t.Fatal("client was unable to send request, err:", err)
 	}
 
-	resp, err := stream.Recv()
+	_, err = stream.Recv()
 	if err != nil {
 		t.Fatal("client was unable to receive response, err:", err)
 	}
 
 	delta := 0.1
 	storage.Upload(sportName, sportLine+delta)
-	resp, err = stream.Recv()
+	resp, err := stream.Recv()
 	if err != nil {
 		t.Fatal("client was unable to receive response, err:", err)
 	}
@@ -292,7 +293,7 @@ func TestGRPCServer_ManySubscribers(t *testing.T) {
 	storage.Upload(sportName2, sportLine2)
 	serverAddr := initServer(t, storage, nil)
 
-	clientFunc := func(serverAddr, sportName string, sportLine float64, timeInterval int32, wg *sync.WaitGroup) {
+	clientFunc := func(serverAddr, sportName string, sportLine float64, timeInterval int32, wg *sync.WaitGroup, errors chan error) {
 		stream := initClient(t, serverAddr)
 		req := &SportLinesRequest{
 			SportNames:   []string{sportName},
@@ -300,32 +301,40 @@ func TestGRPCServer_ManySubscribers(t *testing.T) {
 		}
 		err := stream.Send(req)
 		if err != nil {
-			t.Fatal("client was unable to send request, err:", err)
+			errors <- fmt.Errorf("client was unable to send request, err: %s", err)
 		}
 
 		start := time.Now()
 
 		resp, err := stream.Recv()
 		if err != nil {
-			t.Fatal("client was unable to receive response, err:", err)
+			errors <- fmt.Errorf("client was unable to receive response, err: %s", err)
 		}
 		require.Equal(t, map[string]float64{sportName: sportLine}, resp.SportNameToLine)
 
 		resp, err = stream.Recv()
 		if err != nil {
-			t.Fatal("client was unable to receive response, err:", err)
+			errors <- fmt.Errorf("client was unable to receive response, err: %s", err)
 		}
 
 		elapsedTime := int32(time.Since(start).Seconds())
 		require.GreaterOrEqual(t, elapsedTime, timeInterval)
 		require.Equal(t, map[string]float64{sportName: 0}, resp.SportNameToLine)
 		wg.Done()
+		errors <- nil
 	}
 
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	go clientFunc(serverAddr, sportName, sportLine, 1, wg)
-	go clientFunc(serverAddr, sportName2, sportLine2, 2, wg)
+	errors := make(chan error)
+	go clientFunc(serverAddr, sportName, sportLine, 1, wg, errors)
+	go clientFunc(serverAddr, sportName2, sportLine2, 2, wg, errors)
+	for i := 0; i != 2; i++ {
+		err := <-errors
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	wg.Wait()
 }
 
