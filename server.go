@@ -105,6 +105,7 @@ func (s SportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 	for {
 		select {
 		case <-ctx.Done():
+			cancelFunc()
 			wg.Wait()
 			return ctx.Err()
 		default:
