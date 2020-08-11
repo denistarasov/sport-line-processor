@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"net"
@@ -21,16 +20,23 @@ func main() {
 	grpcAddr := flag.String("grpc", ":8091", "address for grpc server")
 	linesProviderAddr := flag.String("provider", "http://localhost:8000/api/v1/lines/", "address for lines provider server")
 
-	sportNameToPullingInterval := make(map[string]int32)
-	sportNameToPullingInterval["baseball"] = int32(*flag.Int("baseball", 1, "interval for pulling baseball lines (seconds)"))
-	sportNameToPullingInterval["football"] = int32(*flag.Int("football", 1, "interval for pulling football lines (seconds)"))
-	sportNameToPullingInterval["soccer"] = int32(*flag.Int("soccer", 1, "interval for pulling soccer lines (seconds)"))
+	baseballInterval := flag.Int("baseball", 1, "interval for pulling baseball lines (seconds)")
+	footballInterval := flag.Int("football", 1, "interval for pulling football lines (seconds)")
+	soccerInterval := flag.Int("soccer", 1, "interval for pulling soccer lines (seconds)")
 
-	logLevel := *flag.String("log", "info", "log level, allowed options: debug, info, warn, error, fatal")
+	logLevel := flag.String("log", "info", "log level, allowed options: debug, info, warn, error, fatal")
 
 	flag.Parse()
 
-	switch strings.ToLower(logLevel) {
+	sportNameToPullingInterval := make(map[string]int32)
+	sportNameToPullingInterval["baseball"] = int32(*baseballInterval)
+	sportNameToPullingInterval["football"] = int32(*footballInterval)
+	sportNameToPullingInterval["soccer"] = int32(*soccerInterval)
+
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+	switch strings.ToLower(*logLevel) {
 	case "debug":
 		log.SetLevel(log.DebugLevel)
 	case "info":
@@ -41,12 +47,11 @@ func main() {
 		log.SetLevel(log.ErrorLevel)
 	case "fatal":
 		log.SetLevel(log.FatalLevel)
+	default:
+		log.Fatalf("unknown log level: %s", *logLevel)
 	}
 
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
-	log.Info(fmt.Sprintf("starting program (http_address: %s, grpc_address: %s)", *httpAddr, *grpcAddr))
+	log.Infof("starting program (http_address: %s, grpc_address: %s, provider address: %s)", *httpAddr, *grpcAddr, *linesProviderAddr)
 
 	storage := NewStorage()
 
