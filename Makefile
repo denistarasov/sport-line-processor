@@ -2,6 +2,7 @@
 lint:
 	@echo "Running lint"
 	go vet ./...
+	gocritic check -enableAll ./...
 
 tests:
 	@echo "Running tests"
