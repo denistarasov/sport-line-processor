@@ -1,5 +1,6 @@
 
 lint:
+	@echo "Running lint"
 
 tests:
 	@echo "Running tests"
@@ -12,3 +13,7 @@ run:
 stop:
 	@echo "Starting server"
 	sudo docker-compose stop
+
+build:
+	@echo "Building project"
+	go build -o main .
