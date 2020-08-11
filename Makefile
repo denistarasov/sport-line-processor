@@ -1,7 +1,7 @@
 
 install:
 	@echo "Install dependencies"
-	go get -d ./...
+	go get ./...
 
 lint: install
 	@echo "Running lint"
