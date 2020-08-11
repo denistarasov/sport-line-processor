@@ -1,5 +1,9 @@
 
-lint:
+install:
+	@echo "Install dependencies"
+	go get -d ./...
+
+lint: install
 	@echo "Running lint"
 	go vet ./...
 	gocritic check -enableAll ./...
