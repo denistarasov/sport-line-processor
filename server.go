@@ -23,11 +23,11 @@ var (
 )
 
 type sportLinesPublisherServer struct {
-	storage                    *storage
+	storage                    storage
 	sportNameToPullingInterval map[string]int32
 }
 
-func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage *storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
+func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
 	sportNameToPrevLine := make(map[string]float64)
 MainLoop:
 	for {

@@ -5,6 +5,7 @@
 *.so
 *.dylib
 sport-line-processor
+golangci-lint
 
 # Test binary, built with `go test -c`
 *.test
