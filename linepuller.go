@@ -78,7 +78,7 @@ PullingLoop:
 		}
 		sportLine, ok := sportMap[strings.ToUpper(sportName)].(string)
 		if !ok {
-			log.Fatal("...") // todo
+			log.Fatal("sport name doesn't exist in line provider")
 		}
 		sportLineDouble, err := strconv.ParseFloat(sportLine, 64)
 		if err != nil {

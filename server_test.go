@@ -339,8 +339,6 @@ func TestGRPCServer_ManySubscribers(t *testing.T) {
 }
 
 func TestGRPCServer_DeltasIfSportListDidntChange(t *testing.T) {
-	// send 2 times same list of sports
-	// todo
 	storage := newMapStorage()
 	sportName := "soccer"
 	sportLine := 0.5
@@ -437,7 +435,6 @@ func TestGRPCServer_SportNamesDuplicates(t *testing.T) {
 }
 
 func TestGRPCServer_IntervalLessThanStorageUpdate(t *testing.T) {
-	// todo other tests for GRPC errors
 	storage := newMapStorage()
 	storage.Upload("football", 0.1)
 	serverAddr := initServer(t, storage, map[string]int32{"football": 2})
