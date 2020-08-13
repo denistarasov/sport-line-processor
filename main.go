@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"net"
 	"net/http"
@@ -69,7 +68,7 @@ func main() {
 	sportNames := []string{"baseball", "football", "soccer"}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
-	lp := newLinePuller(ctx, *linesProviderAddr, sportNames, storage, wg)
+	lp := newLinePuller(ctx, *linesProviderAddr, sportNames, storage, wg, sportNameToPullingInterval)
 
 	// Start HTTP server
 	srv := &http.Server{Addr: *httpAddr}
@@ -79,9 +78,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		if err := srv.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("ListenAndServe(): %v", err)
-		}
+		_ = srv.ListenAndServe()
 
 		log.Info("server is shut down")
 	}()

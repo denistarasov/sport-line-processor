@@ -37,6 +37,7 @@ func newLinePuller(
 	sportNames []string,
 	storage storage,
 	wg *sync.WaitGroup,
+	sportNameToPullingInterval map[string]int32,
 ) *linePuller {
 	lp := &linePuller{
 		Mutex:              sync.Mutex{},
@@ -50,7 +51,11 @@ func newLinePuller(
 	lp.Lock()
 	for _, sportName := range lp.sportNames {
 		lp.wg.Add(1)
-		go lp.StartLinePullerWorker(ctx, lp.linesProviderAddr, sportName, time.NewTicker(time.Second))
+		interval, exists := sportNameToPullingInterval[sportName]
+		if !exists {
+			log.Fatal("interval for sport is not set")
+		}
+		go lp.StartLinePullerWorker(ctx, lp.linesProviderAddr, sportName, time.NewTicker(time.Second * time.Duration(interval)))
 	}
 	lp.Unlock()
 
