@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/go-critic/go-critic v0.5.0 // indirect
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/golang/protobuf v1.4.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/quasilyte/go-ruleguard v0.1.3 // indirect

@@ -25,12 +25,12 @@ type linePuller struct {
 	sync.Mutex
 	linesProviderAddr  string
 	sportNames         []string
-	storage            *mapStorage
+	storage            storage
 	isLineProviderDown bool
 	wg                 *sync.WaitGroup
 }
 
-func newLinePuller(ctx context.Context, linesProviderAddr string, sportNames []string, storage *mapStorage, wg *sync.WaitGroup) *linePuller {
+func newLinePuller(ctx context.Context, linesProviderAddr string, sportNames []string, storage storage, wg *sync.WaitGroup) *linePuller {
 	lp := &linePuller{
 		Mutex:              sync.Mutex{},
 		linesProviderAddr:  linesProviderAddr,

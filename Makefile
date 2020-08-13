@@ -11,7 +11,7 @@ lint: install
 
 tests:
 	@echo "Running tests"
-	go test -v -race ./...
+	sudo docker-compose -f docker-compose-for-tests.yml up --build --abort-on-container-exit
 
 run:
 	@echo "Starting server"

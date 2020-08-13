@@ -53,7 +53,7 @@ func main() {
 
 	log.Infof("starting program (http_address: %s, grpc_address: %s, provider address: %s)", *httpAddr, *grpcAddr, *linesProviderAddr)
 
-	storage := newMapStorage()
+	storage := newDBStorage()
 
 	sportNames := []string{"baseball", "football", "soccer"}
 	ctx, cancelFunc := context.WithCancel(context.Background())
