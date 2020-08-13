@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMapStorage_Simple(t *testing.T) {
@@ -51,16 +52,19 @@ func TestMapStorage_GetKeys(t *testing.T) {
 
 	key := "football"
 	expected[key] = struct{}{}
+
 	s.Upload(key, 0.1)
 	require.Equal(t, expected, s.GetKeys())
 
 	key = "baseball"
 	expected[key] = struct{}{}
+
 	s.Upload(key, 0.1)
 	require.Equal(t, expected, s.GetKeys())
 
 	key = "soccer"
 	expected[key] = struct{}{}
+
 	s.Upload(key, 0.1)
 	require.Equal(t, expected, s.GetKeys())
 }
@@ -111,16 +115,19 @@ func TestDBStorage_GetKeys(t *testing.T) {
 
 	key := "football"
 	expected[key] = struct{}{}
+
 	s.Upload(key, 0.1)
 	require.Equal(t, expected, s.GetKeys())
 
 	key = "baseball"
 	expected[key] = struct{}{}
+
 	s.Upload(key, 0.1)
 	require.Equal(t, expected, s.GetKeys())
 
 	key = "soccer"
 	expected[key] = struct{}{}
+
 	s.Upload(key, 0.1)
 	require.Equal(t, expected, s.GetKeys())
 }

@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type linePullerStatus int
@@ -30,7 +31,13 @@ type linePuller struct {
 	wg                 *sync.WaitGroup
 }
 
-func newLinePuller(ctx context.Context, linesProviderAddr string, sportNames []string, storage storage, wg *sync.WaitGroup) *linePuller {
+func newLinePuller(
+	ctx context.Context,
+	linesProviderAddr string,
+	sportNames []string,
+	storage storage,
+	wg *sync.WaitGroup,
+) *linePuller {
 	lp := &linePuller{
 		Mutex:              sync.Mutex{},
 		linesProviderAddr:  linesProviderAddr,
@@ -46,10 +53,16 @@ func newLinePuller(ctx context.Context, linesProviderAddr string, sportNames []s
 		go lp.StartLinePullerWorker(ctx, lp.linesProviderAddr, sportName, time.NewTicker(time.Second))
 	}
 	lp.Unlock()
+
 	return lp
 }
 
-func (lp *linePuller) StartLinePullerWorker(ctx context.Context, linesProviderAddr, sportName string, ticker *time.Ticker) {
+func (lp *linePuller) StartLinePullerWorker(
+	ctx context.Context,
+	linesProviderAddr,
+	sportName string,
+	ticker *time.Ticker,
+) {
 	log.Infof("starting worker for %s", sportName)
 PullingLoop:
 	for {
@@ -58,7 +71,7 @@ PullingLoop:
 			break PullingLoop
 		case <-ticker.C:
 		}
-		r, err := http.NewRequest("GET", linesProviderAddr+sportName, nil)
+		r, err := http.NewRequestWithContext(ctx, "GET", linesProviderAddr+sportName, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -67,6 +80,7 @@ PullingLoop:
 			log.Fatal("could not connect to lines provider: ", err)
 		}
 		body, _ := ioutil.ReadAll(resp.Body)
+		defer resp.Body.Close()
 		linesMap := map[string]interface{}{}
 		err = json.Unmarshal(body, &linesMap)
 		if err != nil {
@@ -100,5 +114,6 @@ func (lp *linePuller) isReady() linePullerStatus {
 	if lp.isLineProviderDown {
 		return linesProviderIsUnavailable
 	}
+
 	return notReady
 }

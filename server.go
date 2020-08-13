@@ -2,22 +2,26 @@ package main
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io"
 	"net"
 	"reflect"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type gRPCServerError error
 
 var (
-	duplicateError        gRPCServerError = status.Error(codes.InvalidArgument, "duplicates in sport list")
-	periodicityError      gRPCServerError = status.Error(codes.InvalidArgument, "periodicity of sending lines is more frequent than their pulling periodicity")
+	duplicateError   gRPCServerError = status.Error(codes.InvalidArgument, "duplicates in sport list")
+	periodicityError gRPCServerError = status.Error(
+		codes.InvalidArgument,
+		"periodicity of sending lines is more frequent than their pulling periodicity",
+	)
 	unknownSportNameError gRPCServerError = status.Error(codes.InvalidArgument, "sport name is unknown")
 	emptySportListError   gRPCServerError = status.Error(codes.InvalidArgument, "sport list can't be empty")
 )
@@ -27,7 +31,13 @@ type sportLinesPublisherServer struct {
 	sportNameToPullingInterval map[string]int32
 }
 
-func sender(ctx context.Context, srv SportLinesService_SubscribeOnSportLinesServer, storage storage, senderChan <-chan map[string]struct{}, wg *sync.WaitGroup) {
+func sender(
+	ctx context.Context,
+	srv SportLinesService_SubscribeOnSportLinesServer,
+	storage storage,
+	senderChan <-chan map[string]struct{},
+	wg *sync.WaitGroup,
+) {
 	sportNameToPrevLine := make(map[string]float64)
 MainLoop:
 	for {
@@ -90,12 +100,16 @@ type update struct {
 
 func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_SubscribeOnSportLinesServer) error {
 	log.Info("started gRPC server")
+
 	ctx := srv.Context()
+
 	childCtx, cancelFunc := context.WithCancel(ctx)
 	senderChan := make(chan map[string]struct{})
 	updateChan := make(chan update)
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(1)
+	wg.Add(1)
+
 	go timer(childCtx, updateChan, senderChan, wg)
 	go sender(childCtx, srv, s.storage, senderChan, wg)
 
@@ -107,6 +121,7 @@ func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		case <-ctx.Done():
 			cancelFunc()
 			wg.Wait()
+
 			return ctx.Err()
 		default:
 		}
@@ -115,15 +130,18 @@ func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		if err == io.EOF {
 			cancelFunc()
 			log.Info("connection with client closed due to EOF")
+
 			return nil
 		}
 		if err != nil {
 			log.Errorf("error in gRPC Recv function: %v", err)
+
 			continue
 		}
 
 		if len(req.SportNames) == 0 {
 			cancelFunc()
+
 			return emptySportListError
 		}
 
@@ -131,12 +149,14 @@ func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 			_, exists := validSportNames[sportName]
 			if !exists {
 				cancelFunc()
+
 				return unknownSportNameError
 			}
 
 			pullingInterval := s.sportNameToPullingInterval[sportName]
 			if pullingInterval > req.TimeInterval {
 				cancelFunc()
+
 				return periodicityError
 			}
 		}
@@ -147,12 +167,15 @@ func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 		}
 
 		curSports := make(map[string]struct{})
+
 		for _, sportName := range req.SportNames {
 			_, exists := curSports[sportName]
 			if exists {
 				cancelFunc()
+
 				return duplicateError
 			}
+
 			curSports[sportName] = struct{}{}
 		}
 		if !reflect.DeepEqual(curSports, prevSports) {
@@ -166,9 +189,11 @@ func (s sportLinesPublisherServer) SubscribeOnSportLines(srv SportLinesService_S
 
 func startSportLinesPublisher(s *grpc.Server, listener net.Listener, serverStarted chan struct{}) error {
 	close(serverStarted)
+
 	err := s.Serve(listener)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

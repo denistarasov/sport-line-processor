@@ -2,12 +2,14 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"sync"
-	log "github.com/sirupsen/logrus"
+
 	_ "github.com/go-sql-driver/mysql"
+	log "github.com/sirupsen/logrus"
 )
 
-var	DSN = "root:1234@tcp(db:3306)/golang?charset=utf8"
+const DSN = "root:1234@tcp(db:3306)/golang?charset=utf8"
 
 type storage interface {
 	Upload(key string, value float64)
@@ -38,6 +40,7 @@ func (s *mapStorage) Get(key string) (float64, bool) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	value, exists := s.s[key]
+
 	return value, exists
 }
 
@@ -45,15 +48,18 @@ func (s *mapStorage) GetKeys() map[string]struct{} {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	keys := make(map[string]struct{}, len(s.s))
+
 	for key := range s.s {
 		keys[key] = struct{}{}
 	}
+
 	return keys
 }
 
 func (s *mapStorage) Count() int {
 	s.m.RLock()
 	defer s.m.RUnlock()
+
 	return len(s.s)
 }
 
@@ -62,10 +68,12 @@ func initDB() *sql.DB {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = db.Ping()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	queries := []string{
 		`DROP TABLE IF EXISTS sportlines;`,
 
@@ -92,6 +100,7 @@ type dbStorage struct {
 
 func newDBStorage() *dbStorage {
 	db := initDB()
+
 	return &dbStorage{
 		db: db,
 	}
@@ -99,7 +108,9 @@ func newDBStorage() *dbStorage {
 
 func (s *dbStorage) Upload(key string, value float64) {
 	_, exists := s.Get(key)
+
 	var err error
+
 	if exists {
 		_, err = s.db.Exec(
 			"UPDATE sportlines SET value = ? WHERE sport = ?",
@@ -120,41 +131,55 @@ func (s *dbStorage) Upload(key string, value float64) {
 
 func (s *dbStorage) Get(key string) (float64, bool) {
 	row := s.db.QueryRow("SELECT value FROM sportlines WHERE sport = ?", key)
+
 	var sportLine float64
+
 	err := row.Scan(&sportLine)
-	if err == sql.ErrNoRows {
-		return 0., false
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return sportLine, true
 }
 
 func (s *dbStorage) GetKeys() map[string]struct{} {
 	keys := make(map[string]struct{})
+
 	rows, err := s.db.Query("SELECT sport FROM sportlines")
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err = rows.Err(); err != nil {
+		log.Fatal(err)
+	}
 	defer rows.Close()
+
 	var sport string
+
 	for rows.Next() {
 		err = rows.Scan(&sport)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		keys[sport] = struct{}{}
 	}
+
 	return keys
 }
 
 func (s *dbStorage) Count() int {
 	row := s.db.QueryRow("SELECT COUNT(*) FROM sportlines")
+
 	var count int
+
 	err := row.Scan(&count)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return count
 }

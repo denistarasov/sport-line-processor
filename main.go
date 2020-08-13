@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"net"
 	"net/http"
 	"os"
@@ -13,12 +12,19 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 func main() {
 	httpAddr := flag.String("http", ":8090", "address for http server")
 	grpcAddr := flag.String("grpc", ":8091", "address for grpc server")
-	linesProviderAddr := flag.String("provider", "http://localhost:8000/api/v1/lines/", "address for lines provider server")
+	linesProviderAddr := flag.String(
+		"provider",
+		"http://localhost:8000/api/v1/lines/",
+		"address for lines provider server",
+	)
 
 	baseballInterval := flag.Int("baseball", 1, "interval for pulling baseball lines (seconds)")
 	footballInterval := flag.Int("football", 1, "interval for pulling football lines (seconds)")
@@ -51,7 +57,12 @@ func main() {
 		log.Fatalf("unknown log level: %s", *logLevel)
 	}
 
-	log.Infof("starting program (http_address: %s, grpc_address: %s, provider address: %s)", *httpAddr, *grpcAddr, *linesProviderAddr)
+	log.Infof(
+		"starting program (http_address: %s, grpc_address: %s, provider address: %s)",
+		*httpAddr,
+		*grpcAddr,
+		*linesProviderAddr,
+	)
 
 	storage := newDBStorage()
 
@@ -63,33 +74,42 @@ func main() {
 	// Start HTTP server
 	srv := &http.Server{Addr: *httpAddr}
 	http.HandleFunc("/ready", readyHandler(lp))
+
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("ListenAndServe(): %v", err)
 		}
+
 		log.Info("server is shut down")
 	}()
 
 	// Start gRPC server
 	wg.Add(1)
+
 	grpcServer := grpc.NewServer()
 	RegisterSportLinesServiceServer(grpcServer, sportLinesPublisherServer{
 		storage:                    storage,
 		sportNameToPullingInterval: sportNameToPullingInterval,
 	})
+
 	go func(s *grpc.Server, serverAddr string) {
 		defer wg.Done()
+
 		listener, err := net.Listen("tcp", serverAddr)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		serverStarted := make(chan struct{})
+
 		err = startSportLinesPublisher(s, listener, serverStarted)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		log.Info("grpc server is shut down")
 	}(grpcServer, *grpcAddr)
 
@@ -99,10 +119,12 @@ func main() {
 	sig := <-shutdownSignals
 	log.Infof("received signal (%s), gracefully shutting down...", sig.String())
 	cancelFunc()
+
 	err := srv.Shutdown(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	grpcServer.GracefulStop()
 	wg.Wait()
 }
@@ -112,22 +134,26 @@ func readyHandler(lp *linePuller) http.HandlerFunc {
 		log.Info("/ready: received request")
 		encoder := json.NewEncoder(w)
 		status := lp.isReady()
+
 		switch status {
 		case ready:
 			log.Info("/ready: status ok")
 			w.WriteHeader(http.StatusOK)
+
 			_ = encoder.Encode(map[string]string{
 				"response": "OK",
 			})
 		case notReady:
 			w.WriteHeader(http.StatusServiceUnavailable)
 			log.Info("/ready: not all sports were pulled yet")
+
 			_ = encoder.Encode(map[string]string{
 				"response": "Please try later",
 			})
 		case linesProviderIsUnavailable:
 			log.Info("/ready: lines provider is not available at all")
 			w.WriteHeader(http.StatusServiceUnavailable)
+
 			_ = encoder.Encode(map[string]string{
 				"response": "Service is unavailable",
 			})

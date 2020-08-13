@@ -8,14 +8,15 @@ package main
 
 import (
 	context "context"
+	reflect "reflect"
+	sync "sync"
+
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -175,12 +176,15 @@ func file_sportlines_proto_rawDescGZIP() []byte {
 	return file_sportlines_proto_rawDescData
 }
 
-var file_sportlines_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_sportlines_proto_goTypes = []interface{}{
-	(*SportLinesRequest)(nil),  // 0: protobuf.SportLinesRequest
-	(*SportLinesResponse)(nil), // 1: protobuf.SportLinesResponse
-	nil,                        // 2: protobuf.SportLinesResponse.SportNameToLineEntry
-}
+var (
+	file_sportlines_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+	file_sportlines_proto_goTypes  = []interface{}{
+		(*SportLinesRequest)(nil),  // 0: protobuf.SportLinesRequest
+		(*SportLinesResponse)(nil), // 1: protobuf.SportLinesResponse
+		nil,                        // 2: protobuf.SportLinesResponse.SportNameToLineEntry
+	}
+)
+
 var file_sportlines_proto_depIdxs = []int32{
 	2, // 0: protobuf.SportLinesResponse.sportNameToLine:type_name -> protobuf.SportLinesResponse.SportNameToLineEntry
 	0, // 1: protobuf.SportLinesService.subscribeOnSportLines:input_type -> protobuf.SportLinesRequest
@@ -244,8 +248,10 @@ func file_sportlines_proto_init() {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.

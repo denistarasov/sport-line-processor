@@ -7,7 +7,7 @@ lint: install
 	@echo "Running lint"
 	go vet ./...
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.30.0
-	./golangci-lint run -E gocritic -E golint
+	./golangci-lint run --enable-all -D testpackage -D wsl -D gochecknoglobals -D funlen -D gochecknoinits
 
 tests:
 	@echo "Running tests"
