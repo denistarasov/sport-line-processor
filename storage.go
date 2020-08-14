@@ -4,12 +4,16 @@ import (
 	"database/sql"
 	"errors"
 	"sync"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 )
 
-const DSN = "root:1234@tcp(db:3306)/golang?charset=utf8"
+const (
+	DSN = "root:1234@tcp(db:3306)/golang?charset=utf8"
+	databasePingRetryCount = 5
+)
 
 type storage interface {
 	Upload(key string, value float64)
@@ -69,9 +73,16 @@ func initDB() *sql.DB {
 		log.Fatal(err)
 	}
 
-	err = db.Ping()
+	for i := 0; i != databasePingRetryCount; i++ {
+		err = db.Ping()
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+		log.Info("couldn't connect to database, retrying...")
+	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("connection to database wasn't established after %d retries", databasePingRetryCount)
 	}
 
 	queries := []string{
