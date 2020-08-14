@@ -55,7 +55,7 @@ func newLinePuller(
 		if !exists {
 			log.Fatal("interval for sport is not set")
 		}
-		go lp.StartLinePullerWorker(ctx, lp.linesProviderAddr, sportName, time.NewTicker(time.Second * time.Duration(interval)))
+		go lp.StartLinePullerWorker(ctx, lp.linesProviderAddr, sportName, time.NewTicker(time.Second*time.Duration(interval)))
 	}
 	lp.Unlock()
 

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	DSN = "root:1234@tcp(db:3306)/golang?charset=utf8"
+	DSN                    = "root:1234@tcp(db:3306)/golang?charset=utf8"
 	databasePingRetryCount = 5
 )
 
